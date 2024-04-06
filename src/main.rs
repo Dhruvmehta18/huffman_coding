@@ -450,6 +450,8 @@ fn traverse_and_get_prefixes_int(node: & Option<TreeNodeRef>, bits: &mut Vec<boo
     if let Some(ref node_ref) = node {
         let node_bor = node_ref.borrow();
         if node_bor.is_leaf() {
+            let str: String = bits.to_vec().iter().map(|x| if *x { '1' } else { '0' }).collect();
+            println!("key: {}, value: {}", node_bor.element.unwrap(), str);
             map.insert(node_bor.element.unwrap(), bits.to_vec());
             return;
         } else {
