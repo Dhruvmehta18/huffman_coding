@@ -1,13 +1,11 @@
 # huffman_coding
-Simple Rust based implementation of huffman encoding and decoding.
+Huffman Coding is a simple Rust-based implementation of Huffman encoding and decoding.
 
-This project is from the challenge from this website https://codingchallenges.fyi/challenges/challenge-huffman/
-For algorithm implementation details I have taken reference from this https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/Huffman.html
-
+This project was inspired by a challenge from codingchallenges.fyi and the algorithm implementation details were referenced from ODSA - Huffman Coding.
 
 ## The challenges I faced in this project are - 
-1. I faced major challenge while making multiple references to the TreeNode and multiple owners in rust. As rust follow ownership model using traditional methods of references doesn't work, and we have to use `Rc::RefCell<HuffNode>` type of node to make multiple references
-2. I faced major debugging challenge with BinaryHeap comparison as it was not working correctly when I compare first the weights and elements because when the both element was `None` then ordering was not deterministic as when using serde_json the ordering of Hashmap is changed. So when decoding the heap will gives wrong order which will make prefixes wrong.
+1. **Handling Multiple References:** A major challenge was dealing with multiple references to the TreeNode and multiple owners in Rust. Traditional methods of using references didn't work due to Rust's ownership model, requiring the use of `Rc::RefCell<HuffNode>` to create multiple references.
+2. **Debugging BinaryHeap Comparison:** Debugging the comparison in BinaryHeap was challenging because it wasn't working correctly when comparing the weights and elements. This issue arose when both elements were None, leading to non-deterministic ordering due to the use of serde_json, which changes the ordering of HashMap. As a result, the heap provided the wrong order during decoding, affecting the correctness of the prefixes.
    ```rust
    // Old Implementation
    
@@ -110,13 +108,12 @@ For algorithm implementation details I have taken reference from this https://op
         }
     }
    ```
-   In new implementation i also have added id which is generated incrementally, so I can compare two nodes where the element is `None` which makes the BinaryHeap pop deterministic.
-3. When encoding and decoding i also have to make sure that I use compressed bits to the file and rust doesn't provide direct implementation of bits, so will have to convert bytes `u8` to bits
-
+   In the new implementation, an `id` field was added, generated incrementally, to ensure deterministic behavior when comparing nodes where the element is `None`.
+3. **Encoding and Decoding:** Ensuring the use of compressed bits for file I/O was also challenging because Rust doesn't provide direct bit manipulation. Conversion from bytes `u8` to bits had to be implemented.
 ## Assumptions-
-1. I have taken assumption that the unique characters in string should be greater than equal to 2
-2. I have also use `serde_json` to store mappings which will be less efficient compare to [Canonical Encoding](https://en.wikipedia.org/wiki/Canonical_Huffman_code) in which the mappings can be stored in $B*2^B$ bits of information (where B is the number of bits per symbol).
-3. I have also `panic`(rust term) in most cases and have not done custom error handling which can be done using `thiserror` package (have done it for read file error though).
+1. The implementation assumes that the unique characters in the input string are greater than or equal to 2.
+2. It uses `serde_json` to store mappings, which may be less efficient compared to [Canonical Encoding](https://en.wikipedia.org/wiki/Canonical_Huffman_code), where mappings can be stored in $B*2^B$ bits of information (where B is the number of bits per symbol).
+3. Custom error handling using the `thiserror` package was not implemented extensively, except for handling read file errors.
 
 ### Running the code
 You can run the encoding algorithm using - 
@@ -129,7 +126,8 @@ You can run the decoding algorithm using -
 cargo run -- /absolute-path-to-huf-file -d
 ```
 
-Extra Dependencies which I have used are  
+### Extra Dependencies
+Additional dependencies used in this project:  
 ```toml
 thiserror = "1.0.56" # custom error handling package
 clap = { version = "4.5.0", features = ["derive"] } # command line argument parser packages
