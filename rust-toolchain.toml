@@ -1,0 +1,12 @@
+[toolchain]
+# Example rust-toolchain file specifying Rust compiler and Cargo versions
+# Rust compiler version
+edition = "2021"
+# Specify the Rust compiler version
+# This will use the specified version of rustc
+channel = "1.74.0"
+# Specify the Cargo version
+# This will use the specified version of Cargo
+# Note: Cargo version specification is supported starting from Rust 1.43
+cargo = "1.74.0"
+components = ["rustfmt", "clippy"]
