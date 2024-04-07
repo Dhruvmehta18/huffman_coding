@@ -2,17 +2,17 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 use std::fmt::{Display, Formatter};
-use std::{fs, io};
+use std::fs;
 use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Bytes, Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use clap::Parser;
+use log::error;
 use serde_json::Value;
 use thiserror::Error;
-use log::error;
 
 #[derive(Parser, Default, Debug)]
 #[command(version, about, long_about = "huffman compression implementation in rust")]
@@ -30,29 +30,31 @@ enum FindError {
     ReadFileError(#[from] std::io::Error)
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Debug, Clone)]
 struct HuffNode {
     weight: u32,
     element: Option<char>,
     left: Option<TreeNodeRef>,
-    right: Option<TreeNodeRef>
+    right: Option<TreeNodeRef>,
+    id: u32
 }
 
 type TreeNodeRef = Rc<RefCell<HuffNode>>;
 
 impl Display for HuffNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "HuffNode {{ weight: {}, element: {:?} }}", self.weight, self.element)
+        write!(f, "HuffNode {{ weight: {}, element: {:?} id: {:?} }}", self.weight, self.element, self.id)
     }
 }
 
 impl HuffNode {
-    fn new(left: HuffNode, right: HuffNode) -> HuffNode {
+    fn new(left: HuffNode, right: HuffNode, id: u32) -> HuffNode {
         Self {
             weight: left.weight() + right.weight(),
             element: None,
             left: Option::from(Rc::new(RefCell::new(left))),
-            right: Option::from(Rc::new(RefCell::new(right)))
+            right: Option::from(Rc::new(RefCell::new(right))),
+            id
         }
     }
 
@@ -68,10 +70,25 @@ impl HuffNode {
     }
 }
 
+impl PartialEq for HuffNode {
+    fn eq(&self, other: &Self) -> bool {
+        if other.weight().eq(&self.weight()) {
+            self.element.eq(&other.element)
+        } else {
+            other.weight().eq(&self.weight())
+        }
+    }
+}
+
 impl PartialOrd for HuffNode {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         if other.weight().eq(&self.weight()) {
-            Some(other.element.cmp(&self.element))
+            match (self.element, other.element) {
+                (None, None) => Some(other.id.cmp(&self.id)),
+                (Some(_), None) => { Option::from(Ordering::Greater) }
+                (None, Some(_)) => { Option::from(Ordering::Less) }
+                (Some(el1), Some(el2)) => Option::from(el1.cmp(&el2))
+            }
         } else {
             Some(other.weight().cmp(&self.weight()))
         }
@@ -81,7 +98,12 @@ impl PartialOrd for HuffNode {
 impl Ord for HuffNode {
     fn cmp(&self, other: &Self) -> Ordering {
         if other.weight().eq(&self.weight()) {
-            other.element.cmp(&self.element)
+            match (self.element, other.element) {
+                (None, None) => other.id.cmp(&self.id),
+                (Some(_), None) => { Ordering::Greater }
+                (None, Some(_)) => { Ordering::Less }
+                (Some(el1), Some(el2)) => el1.cmp(&el2)
+            }
         } else {
             other.weight().cmp(&self.weight())
         }
@@ -164,7 +186,6 @@ impl HuffmanDecoder {
         let mut counter_n = 0;
         println!("len ========={}", self.bytes.len());
         for byte in self.bytes[counter+1..].bytes() {
-            // Unwrap the line or handle the error
             let b = byte.unwrap();
             header_byte_counter += 1;
             if b == b'\n' {
@@ -227,7 +248,7 @@ impl HuffmanDecoder {
                 counter += 1;
                 let bit = (*byte >> i) & 1;
                 if bit == 0 {
-                    print!("0");
+                    // print!("0");
                     let tmp = Rc::clone(&tmp_node);
                     match &tmp.borrow().left {
                         None => {
@@ -246,7 +267,7 @@ impl HuffmanDecoder {
                         }
                     };
                 } else {
-                    print!("1");
+                    // print!("1");
                     let tmp = Rc::clone(&tmp_node);
                     match &tmp.borrow().right {
                         None => {
@@ -312,6 +333,10 @@ fn encode(path: &String) {
         Ok(file_str) => {
             let huff_freq = get_frequency_from_string(&file_str);
             println!("{:?}", &huff_freq);
+            
+            if huff_freq.len()<2 { 
+                panic!("Cannot build huffman for less than 2 unique character");
+            }
 
 
             let mut priority_queue = get_priority_queue(&huff_freq);
@@ -329,7 +354,7 @@ fn encode(path: &String) {
 
                 for c in file_str.chars() {
                     for bit in huff_map.get(&c).unwrap() {
-                        print!("{}", if *bit { "1"} else {"0"});
+                        // print!("{}", if *bit { "1"} else {"0"});
                         bits_encoder.add_bit(*bit)
                     }
                 }
@@ -340,9 +365,6 @@ fn encode(path: &String) {
                     let mappings = serialize_huffman_mappings(&huff_freq).unwrap();
                     let mapping_bytes = (mappings+"\n\n").into_bytes();
                     println!("le === ==== {}", mapping_bytes.len());
-                    let mut file = OpenOptions::new()
-                        .append(true)
-                        .open(&compress_file_path).unwrap();
                     match fs::write(&compress_file_path, bits_encoder.bits_count.to_string().to_owned() + "\n") {
                         Ok(_) => {
                             println!("size {} written to file", &bits_encoder.bits_count);
@@ -351,6 +373,10 @@ fn encode(path: &String) {
                             panic!("writing failed {}", err);
                         }
                     }
+
+                    let mut file = OpenOptions::new()
+                        .append(true)
+                        .open(&compress_file_path).unwrap();
                     
                     match file.write_all(&mapping_bytes) {
                         Ok(_) => {
@@ -382,32 +408,32 @@ fn encode(path: &String) {
 
 fn get_priority_queue(huff_freq: &HashMap<char, u32>) -> BinaryHeap<HuffNode> {
 
-    let mut sorted_keys: Vec<_> = huff_freq.keys().collect();
-    sorted_keys.sort(); // Sort the keys
-    
+    let mut counter = 0;
     let mut priority_queue = BinaryHeap::new();
-
-    for key in sorted_keys {
-        if let Some(value) = huff_freq.get(key) {
-            println!("Key: {}, Value: {}", key, value);
-            priority_queue.push(HuffNode {
-                weight: *value,
-                element: Some(*key),
-                left: None,
-                right: None,
-            })
-        }
+    for (key, value) in huff_freq {
+        println!("Key: {}, Value: {}", key, value);
+        priority_queue.push(HuffNode {
+            weight: *value,
+            element: Some(*key),
+            left: None,
+            right: None,
+            id: counter
+        });
+        counter += 1;
     }
+    
     priority_queue
 }
 
 fn get_huffman_tree_node(priority_queue: &mut BinaryHeap<HuffNode>) -> Option<HuffNode> {
+    let mut counter = priority_queue.len() as u32;
     while priority_queue.len() > 1 {
         let tmp1 = priority_queue.pop().unwrap();
         let tmp2 = priority_queue.pop().unwrap();
         println!("tmp1 = {} ,,, tmp2 = {}", tmp1, tmp2);
-        let tree_node = Option::from(Rc::new(RefCell::new(HuffNode::new(tmp1, tmp2))));
-        priority_queue.push(tree_node.unwrap().borrow().to_owned())
+        let tree_node = Option::from(Rc::new(RefCell::new(HuffNode::new(tmp1, tmp2, counter))));
+        priority_queue.push(tree_node.unwrap().borrow().to_owned());
+        counter += 1;
     }
 
     priority_queue.pop()
@@ -450,8 +476,8 @@ fn traverse_and_get_prefixes_int(node: & Option<TreeNodeRef>, bits: &mut Vec<boo
     if let Some(ref node_ref) = node {
         let node_bor = node_ref.borrow();
         if node_bor.is_leaf() {
-            let str: String = bits.to_vec().iter().map(|x| if *x { '1' } else { '0' }).collect();
-            println!("key: {}, value: {}", node_bor.element.unwrap(), str);
+            // let str: String = bits.to_vec().iter().map(|x| if *x { '1' } else { '0' }).collect();
+            // println!("key: {}, value: {}", node_bor.element.unwrap(), str);
             map.insert(node_bor.element.unwrap(), bits.to_vec());
             return;
         } else {
@@ -499,7 +525,6 @@ mod tests {
             Ok(content) => content,
             Err(_) => return false, // Return false if unable to read file2
         };
-
         // Compare the contents of both files
         file1_content == file2_content
     }
@@ -559,7 +584,7 @@ mod tests {
         let file_decode_path = current_dir.join("small.huf");
         decode(&file_decode_path.to_str().unwrap().to_string());
         let file_decoded_path = current_dir.join("small_decode.txt");
-        files_have_same_content(file_path.to_str().unwrap(), file_decoded_path.to_str().unwrap());
+        assert_eq!(files_have_same_content(file_path.to_str().unwrap(), file_decoded_path.to_str().unwrap()), true);
     }
     
     #[test]
@@ -574,6 +599,6 @@ mod tests {
         let file_decode_path = current_dir.join(PATH_TO_DECODE);
         decode(&file_decode_path.to_str().unwrap().to_string());
         let file_decoded_path = current_dir.join(PATH_DECODED_FILE);
-        files_have_same_content(file_path.to_str().unwrap(), file_decoded_path.to_str().unwrap());
+        assert_eq!(files_have_same_content(file_path.to_str().unwrap(), file_decoded_path.to_str().unwrap()), true);
     }
 }
