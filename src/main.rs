@@ -43,7 +43,7 @@ struct HuffNode {
     id: u32,
 }
 
-type TreeNodeRef = Rc<RefCell<HuffNode>>;
+type TreeNodeRef = Rc<HuffNode>;
 
 impl Display for HuffNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -60,8 +60,8 @@ impl HuffNode {
         Self {
             weight: left.weight() + right.weight(),
             element: None,
-            left: Option::from(Rc::new(RefCell::new(left))),
-            right: Option::from(Rc::new(RefCell::new(right))),
+            left: Option::from(Rc::new(left)),
+            right: Option::from(Rc::new(right)),
             id,
         }
     }
@@ -230,14 +230,14 @@ impl HuffmanDecoder {
             }
             Some(node) => {
                 println!("root node {}", node);
-                let huff_map = traverse_and_get_prefixes(Rc::new(RefCell::new(node.clone())));
+                let huff_map = traverse_and_get_prefixes(Rc::new(node.clone()));
 
                 for (key, value) in &huff_map {
                     let bit_str: String =
                         value.iter().map(|x| if *x { '1' } else { '0' }).collect();
                     println!("{} | {}", key, bit_str);
                 }
-                self.decoding(&Rc::new(RefCell::new(node)), header_byte_counter, file_size);
+                self.decoding(&Rc::new(node), header_byte_counter, file_size);
             }
         }
     }
@@ -258,13 +258,13 @@ impl HuffmanDecoder {
                 if bit == 0 {
                     // print!("0");
                     let tmp = Rc::clone(&tmp_node);
-                    match &tmp.borrow().left {
+                    match &tmp.left {
                         None => {
                             panic!("File is invalid");
                         }
                         Some(node_ref) => {
                             let node = Rc::clone(node_ref);
-                            let next_node = match node.borrow().element {
+                            let next_node = match node.element {
                                 None => Rc::clone(&node),
                                 Some(c) => {
                                     buffer.extend_from_slice(c.encode_utf8(&mut [0; 4]).as_bytes());
@@ -277,13 +277,13 @@ impl HuffmanDecoder {
                 } else {
                     // print!("1");
                     let tmp = Rc::clone(&tmp_node);
-                    match &tmp.borrow().right {
+                    match &tmp.right {
                         None => {
                             panic!("File is invalid");
                         }
                         Some(node_ref) => {
                             let node = Rc::clone(node_ref);
-                            let next_node = match node.borrow().element {
+                            let next_node = match node.element {
                                 None => Rc::clone(&node),
                                 Some(c) => {
                                     buffer.extend_from_slice(c.encode_utf8(&mut [0; 4]).as_bytes());
@@ -349,7 +349,7 @@ fn encode(path: &String) {
 
             if let Some(node) = get_huffman_tree_node(&mut priority_queue) {
                 println!("root node {}", node);
-                let huff_map = traverse_and_get_prefixes(Rc::new(RefCell::new(node)));
+                let huff_map = traverse_and_get_prefixes(Rc::new(node));
 
                 for (key, value) in &huff_map {
                     let bit_str: String =
@@ -490,7 +490,7 @@ fn traverse_and_get_prefixes_int(
     map: &mut HashMap<char, Vec<bool>>,
 ) {
     if let Some(ref node_ref) = node {
-        let node_bor = node_ref.borrow();
+        let node_bor = node_ref;
         if node_bor.is_leaf() {
             // let str: String = bits.to_vec().iter().map(|x| if *x { '1' } else { '0' }).collect();
             // println!("key: {}, value: {}", node_bor.element.unwrap(), str);

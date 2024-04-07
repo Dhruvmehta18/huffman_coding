@@ -1,10 +1,10 @@
 # huffman_coding
 Huffman Coding is a simple Rust-based implementation of Huffman encoding and decoding.
 
-This project was inspired by a challenge from codingchallenges.fyi and the algorithm implementation details were referenced from ODSA - Huffman Coding.
-
+This project was inspired by a challenge from coding challenges.fyi and the algorithm implementation details were referenced from [huffman coding challenge](https://codingchallenges.fyi/challenges/challenge-huffman/) - Huffman Coding.
+The implementation details are from [Huffman coding](https://opendsa-server.cs.vt.edu/ODSA/Books/CS3/html/Huffman.html)
 ## The challenges I faced in this project are - 
-1. **Handling Multiple References:** A major challenge was dealing with multiple references to the TreeNode and multiple owners in Rust. Traditional methods of using references didn't work due to Rust's ownership model, requiring the use of `Rc::RefCell<HuffNode>` to create multiple references.
+1. **Handling Multiple References:** A major challenge was dealing with multiple references to the TreeNode and multiple owners in Rust. Traditional methods of using references didn't work due to Rust's ownership model, requiring the use of `Rc<HuffNode>` to create multiple references.
 2. **Debugging BinaryHeap Comparison:** Debugging the comparison in BinaryHeap was challenging because it wasn't working correctly when comparing the weights and elements. This issue arose when both elements were None, leading to non-deterministic ordering due to the use of serde_json, which changes the ordering of HashMap. As a result, the heap provided the wrong order during decoding, affecting the correctness of the prefixes.
    ```rust
    // Old Implementation
